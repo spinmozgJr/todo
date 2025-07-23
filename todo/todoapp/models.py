@@ -1,4 +1,6 @@
+from django.contrib.auth.models import User
 from django.db import models
+
 
 # Create your models here.
 class Todo(models.Model):
@@ -19,6 +21,7 @@ class Todo(models.Model):
     deadline = models.DateTimeField(verbose_name='Дедлайн')
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium', verbose_name='Приоритет')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending', verbose_name='Статус')
+    user = models.ForeignKey(User, verbose_name='Пользователь', on_delete=models.CASCADE)
 
     def __str__(self):
         return self.title

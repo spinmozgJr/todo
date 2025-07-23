@@ -1,18 +1,38 @@
+from django.contrib.auth import logout
 from django.shortcuts import render
-from rest_framework import generics, viewsets, status
+from rest_framework import generics, viewsets, status, permissions
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import filters
 
 from .models import Todo
+from .permissions import IsOwnerOrAdmin
 from .serializers import TodoSerializer
 
 
+class TodoViewSetPagination(PageNumberPagination):
+    page_size = 5
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
 # Create your views here.
 class TodoViewSet(viewsets.ModelViewSet):
-    # queryset = Todo.objects.all()
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdmin]
     serializer_class = TodoSerializer
 
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'description']
+
     def get_queryset(self):
-        queryset = Todo.objects.all()
+        user = self.request.user
+
+        if user.is_superuser:
+            queryset = Todo.objects.all()
+        else:
+            queryset = Todo.objects.filter(user=user)
+
         status_param = self.request.query_params.get('status')
         priority_param = self.request.query_params.get('priority')
 
@@ -32,4 +52,8 @@ class TodoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+class LogoutView(APIView):
+    def post(self, request):
+        logout(request)
+        return Response({"detail": "Вы вышли из системы."})
 
