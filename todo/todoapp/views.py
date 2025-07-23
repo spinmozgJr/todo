@@ -1,3 +1,4 @@
+from celery.result import AsyncResult
 from django.contrib.auth import logout
 from django.shortcuts import render
 from rest_framework import generics, viewsets, status, permissions
@@ -10,7 +11,7 @@ from rest_framework import filters
 from .models import Todo
 from .permissions import IsOwnerOrAdmin
 from .serializers import TodoSerializer
-
+from .tasks import export_user_todos_to_csv
 
 class TodoViewSetPagination(PageNumberPagination):
     page_size = 5
@@ -52,8 +53,31 @@ class TodoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-class LogoutView(APIView):
-    def post(self, request):
-        logout(request)
-        return Response({"detail": "Вы вышли из системы."})
+# class LogoutView(APIView):
+#     def post(self, request):
+#         logout(request)
+#         return Response({"detail": "Вы вышли из системы."})
 
+
+class ExportTodosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        task = export_user_todos_to_csv.delay(request.user.id)
+        return Response({
+            "task_id": task.id,
+            "status_url": f"/api/tasks/{task.id}/"
+        })
+
+
+class TaskStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        result = AsyncResult(task_id)
+        if result.successful():
+            return Response({
+                "status": "completed",
+                "download_url": request.build_absolute_uri(result.result)
+            })
+        return Response({"status": result.status.lower()})
